@@ -1,0 +1,45 @@
+# Dependencies for "Explainable Bayesian Graph Fusion for Scam/Phishing Detection".
+#
+# Versions are pinned EXACTLY on purpose:
+#  1. a fresh `pip install -r requirements.txt` gives the same versions we tested on,
+#     so the numbers in our paper can be reproduced;
+#  2. pgmpy renamed classes between 0.1.x and 1.x, so a floating version would silently
+#     break F1/F5. One pinned version = one code path = one thing to explain.
+#
+# Resolved and verified on Python 3.13.13 (Linux). See docs/SETUP.md.
+# Install with:  pip install -r requirements.txt
+
+# --- Core data handling: used by every file ---
+pandas==3.0.6
+numpy==2.5.4
+
+# --- Machine learning ---
+# F3: SelectKBest + mutual_info_classif (feature selection)
+# F4: GradientBoostingClassifier + LogisticRegression (stacked ensemble)
+# F6: CountVectorizer (bag of phonetic codes)
+scikit-learn==1.9.1
+
+# --- Graphs ---
+# graph_builder.py + F3: sender -> recipient directed graph, PageRank, betweenness
+networkx==3.7
+
+# --- Bayesian networks ---
+# F1: DiscreteBayesianNetwork, MaximumLikelihoodEstimator, VariableElimination
+# F5: HillClimbSearch with scoring_method="bic-d" / "bdeu", ExpertKnowledge blacklist
+# F7: repeated inference to search for counterfactuals
+pgmpy==1.1.2
+
+# --- Charts ---
+# F5: expert vs learned structure PNGs
+# F8: attack-success bar chart
+matplotlib==3.11.2
+
+# --- Demo app ---
+streamlit==1.65.0
+
+# --- Dataset download ---
+# Phase 1: pulls the small real Hinglish scam seed from Hugging Face
+huggingface_hub==2.2.0
+
+# --- Tests ---
+pytest==9.1.1
