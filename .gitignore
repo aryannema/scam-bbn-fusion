@@ -1,0 +1,27 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+
+# ---- Virtual environments (never commit these) ----
+.venv/
+venv/
+env/
+
+# ---- Downloaded datasets (big, public, re-downloadable) ----
+# data/raw/ holds the UCI SMS Spam zip and the Hugging Face Hinglish seed.
+# We never commit them: anyone can re-download with `python -m src.data_builder`.
+data/raw/*
+!data/raw/.gitkeep
+
+# ---- Generated artifacts (PNGs, charts, large result CSVs) ----
+outputs/
+
+# ---- Test / notebook caches ----
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- OS noise ----
+.DS_Store
+Thumbs.db
