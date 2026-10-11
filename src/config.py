@@ -70,8 +70,21 @@ N_SYNTHETIC_MESSAGES = 2500
 # ---------------------------------------------------------------------------
 # Synthetic sender network (used by src/data_builder.py in Phase 1)
 # ---------------------------------------------------------------------------
-N_SENDERS = 1000
+# We do NOT fix the sender count directly. Instead we fix how BUSY a sender is and let
+# the count follow from the number of messages, because that is what creates the signal
+# F3 looks for: a scam campaign is a few senders blasting many strangers, while a normal
+# person sends a few messages to the same handful of contacts.
+MESSAGES_PER_SCAM_SENDER = 25    # few scam senders, each very busy  -> high fan-out
+MESSAGES_PER_BENIGN_SENDER = 6   # many normal senders, each quiet   -> low fan-out
+BENIGN_CONTACTS = 3              # a normal person texts the same ~3 people repeatedly
+
+# With the message counts we actually build, the two numbers above work out to roughly
+# 1,000 senders, which is the scale the project brief asks for.
 N_RECIPIENTS = 3000
+
+# How many messages one "ring" (one campaign) accounts for. Rings are the unit we hold
+# out in the leak-safe split, so smaller rings = finer control over the split size.
+MESSAGES_PER_RING = 300
 
 # Label noise, so the graph features are NOT a giveaway and the task stays realistic:
 # some scam senders behave like normal people, and some innocent senders look odd.
