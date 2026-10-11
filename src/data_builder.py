@@ -35,9 +35,14 @@ import numpy as np
 import pandas as pd
 
 from src.config import (
+    ACTIVITY_SPREAD,
+    BURST_HOURS_MAX,
+    BURST_HOURS_MIN,
     COMBINED_CSV,
     BENIGN_CONTACTS,
     FRAC_BENIGN_SENDERS_LOOK_ODD,
+    RING_VICTIM_POOL,
+    SOCIAL_CIRCLE,
     FRAC_SCAM_SENDERS_LOOK_NORMAL,
     HF_HINGLISH_DATASET,
     MESSAGES_PER_BENIGN_SENDER,
@@ -119,10 +124,11 @@ SCAM_TEMPLATES = {
 # ---------------------------------------------------------------------------
 BENIGN_TEMPLATES = {
     "delivery_update": [
-        "Aapka {item} order deliver ho gaya hai. Track ID {trackid}. Thank you for shopping!",
-        "Your {item} parcel will arrive in {hours} hours. Order ID {trackid}",
+        "Aapka {item} order deliver ho gaya hai. Track ID {trackid}: {safelink}",
+        "Your {item} parcel will arrive in {hours} hours. Track here: {safelink}",
         "{name}, Flipkart order shipped hai, kal tak aa jayega. Track: {trackid}",
         "Delivery agent {hours} minute me pahunch raha hai {place} par. Please ghar par rahein.",
+        "Your {item} order is out for delivery. Order ID {trackid}, details at {safelink}",
     ],
     "otp_genuine": [
         "{otp} is your OTP for {bank} login. Kisi ke saath share na karein.",
@@ -133,8 +139,9 @@ BENIGN_TEMPLATES = {
     "bank_statement": [
         "{amount} credited to your {bank} account. Available balance updated.",
         "{bank}: {amount} debited for electricity bill. Payment successful raha.",
-        "Aapka {bank} monthly statement ready hai. Net banking par dekh lein {name}.",
+        "Aapka {bank} monthly statement ready hai: {safelink}",
         "Payment of {amount} received from {name}. UPI Ref {trackid}",
+        "{bank}: {amount} debited. Statement dekhein {safelink}",
     ],
     "friend_chat": [
         "{name} yaar kal {item} lene chalein? {time} baje nikalte hain.",
@@ -148,9 +155,16 @@ BENIGN_TEMPLATES = {
         "Papa ki tabiyat theek hai ab, doctor ne {hours} din rest bola hai.",
         "{name} ki shaadi December me hai, sabko invite bhej diya hai.",
     ],
+    "promo_optin": [
+        "{name}, aapke {item} order par 10% off. Offer dekhein: {shortlink}",
+        "Thank you for shopping! Rate your {item} delivery here: {shortlink}",
+        "{bank} rewards: aapke {amount} points ready hain. Details: {shortlink}",
+        "Your {item} is back in stock. Shop now: {shortlink}",
+    ],
     "work_message": [
         "Meeting {time} baje reschedule ho gayi hai {place} me. Calendar update kar lein.",
         "Report attach kar di hai email me. {name} review karke batayein.",
+        "Project tracker update ho gaya hai, dekh lein: {safelink}",
         "Team lunch Friday ko hai {place} par. RSVP kar dein {name}.",
         "Project files bhej diye hain, {time} tak feedback dena {name}.",
     ],
@@ -187,6 +201,24 @@ PLACEHOLDER_VALUES = {
         "https://upi-refund-help.com", "http://icici.co.in-verify.xyz", "https://tinyurl.com/kycfix",
     ],
     "upi": ["help@ybl", "refund@paytm", "support2026@okaxis", "claim@ibl"],
+    # LEGITIMATE links, for benign messages. These matter more than they look: if only
+    # scam messages ever contained a URL, "has a link" would identify a scam almost
+    # perfectly and every result in the paper would be inflated. Real delivery and bank
+    # messages carry links, so ours must too. Note these use real company domains with
+    # ordinary TLDs, so F2's link-risk features (shortener? throwaway TLD?) still tell
+    # the two kinds of link apart - which is the signal we actually want to learn.
+    "safelink": [
+        "https://www.flipkart.com/orders", "https://www.amazon.in/orders",
+        "https://www.sbi.co.in/netbanking", "https://www.icicibank.com/statement",
+        "https://www.hdfcbank.com/login", "https://track.delhivery.com",
+    ],
+    # Shortened links in GENUINE messages. Legitimate brands really do send
+    # "track your order: bit.ly/..." promotional SMS. We include them deliberately,
+    # because otherwise a shortened link would mean "scam" with 100% certainty: F1's
+    # LinkRisk node would jump straight to probability 1.0, and F7's counterfactuals
+    # would collapse to "remove the link" every single time. These rows are the HARD
+    # benign cases, and a detector worth reporting has to cope with them.
+    "shortlink": ["bit.ly/3FlipKart", "tinyurl.com/myorder22", "bit.ly/SBIstmt"],
     # These exist so BENIGN templates vary as much as scam ones. Without them, a line
     # like "Lunch kiya?" generates the identical string every time, drop_duplicates
     # removes all but one, and we end up with almost no benign Hinglish to train on.
@@ -426,11 +458,33 @@ def _add_sender_history(senders, rng):
     looks_odd = _choose_fraction(~is_scammer, FRAC_BENIGN_SENDERS_LOOK_ODD, rng)
     senders["behaves_scammy"] = (is_scammer & ~hides) | looks_odd
     scammy = senders["behaves_scammy"].to_numpy()
-    # a fresh account with many complaints vs an old account with almost none
-    senders["past_reports"] = np.where(scammy, rng.poisson(6, n), rng.poisson(0.3, n))
-    senders["account_age_days"] = np.where(scammy, rng.integers(1, 120, n),
-                                           rng.integers(200, 3000, n))
+    # A fresh account with several complaints, versus an old account with almost none.
+    #
+    # THE RANGES DELIBERATELY OVERLAP. An earlier version used 1-120 days for scammy
+    # accounts and 200-3000 for the rest - no overlap at all, so account age alone
+    # almost gave the label away and the model leaned on it above everything else.
+    # Overlapping them means a brand-new innocent account can look suspicious and a
+    # patient scammer who aged their account can look fine, which is the real problem.
+    senders["past_reports"] = np.where(scammy, rng.poisson(3, n), rng.poisson(0.6, n))
+    senders["account_age_days"] = np.where(scammy, rng.integers(1, 400, n),
+                                           rng.integers(30, 3000, n))
+    senders["activity_weight"] = _activity_weights(scammy, rng)
     return senders
+
+
+def _activity_weights(scammy, rng):
+    """
+    Decide how busy each account is.
+
+    WHAT: returns a lognormal weight per sender; bigger means more messages.
+    WHY:  drawn from a lognormal so the result is heavy tailed, like real traffic: most
+          senders are quiet and a few send a great deal. Scammy behaviour shifts the
+          average up 3x but does NOT separate the groups, because the tails overlap -
+          which is exactly the point. With a fixed quota instead, message volume alone
+          reached F1 = 1.00 and gave the whole answer away.
+    """
+    base = np.where(scammy, 3.0, 1.0)
+    return rng.lognormal(np.log(base), ACTIVITY_SPREAD, len(scammy))
 
 
 def _sender_number(sender_id):
@@ -458,16 +512,20 @@ def assign_senders(messages, senders, rng):
           (ratio well below 1.0). That contrast is the graph signal.
     """
     by_family = {f: g["sender_id"].tolist() for f, g in senders.groupby("template_family")}
+    # probability of picking each sender, proportional to how active that account is
+    weights = {f: (g["activity_weight"] / g["activity_weight"].sum()).to_numpy()
+               for f, g in senders.groupby("template_family")}
+    contacts = build_contact_lists(senders)
     lookup = senders.set_index("sender_id")
     sent_counts = {}                    # how many messages this sender has sent so far
     chosen, recipients, stamps = [], [], []
     for family, text_label in zip(messages["template_family"], messages["label"]):
-        sender = str(rng.choice(by_family[family]))
+        sender = str(rng.choice(by_family[family], p=weights[family]))
         position = sent_counts.get(sender, 0)
         sent_counts[sender] = position + 1
         scammy = bool(lookup.loc[sender, "behaves_scammy"])
         chosen.append(sender)
-        recipients.append(_pick_recipient(sender, position, scammy, rng))
+        recipients.append(_pick_recipient(contacts[sender], sender, position, scammy, rng))
         stamps.append(_pick_timestamp(sender, scammy, rng))
     out = messages.copy()
     out["sender_id"] = chosen
@@ -476,30 +534,97 @@ def assign_senders(messages, senders, rng):
     return out.merge(senders[["sender_id", "sender_ring"]], on="sender_id", how="left")
 
 
-def _pick_recipient(sender, position, scammy, rng):
+def build_contact_lists(senders):
     """
-    Choose who this message goes to.
+    Decide, for every sender, which people they message.
 
-    WHAT: returns a recipient id like "R01234".
-    WHY:  scammy senders mostly spray strangers, so their recipients keep being new.
-          Normal senders mostly reuse a tiny contact list.
-    THE JITTER MATTERS: without it, every scammy sender would hit a brand-new person
-    every single time, so "unique recipients / messages sent == 1.0" would identify a
-    scammer perfectly and F3 would have a free answer instead of a real problem. So a
-    scammer sometimes messages the same victim twice, and a normal person sometimes
-    messages someone new.
+    WHAT: returns {sender_id: [recipient ids]}.
+    WHY:  THIS IS WHAT GIVES THE GRAPH ITS SHAPE, and three of F3's features depend
+          entirely on it:
+            * Ordinary-looking accounts are placed in small social circles and mostly
+              message each other. Because a recipient here is ANOTHER SENDER, messages
+              flow both ways, friends-of-friends form triangles, and `clustering` and
+              `pagerank` become meaningful. In a pure sender->recipient graph both are
+              dead: there are no triangles and senders have no incoming edges at all.
+            * An account that BEHAVES like a campaign gets a long victim list shared
+              with the rest of its ring, so the ring shows up as a group.
+            * Victims are drawn mostly from real people, because that is who gets
+              scammed - not from a separate pool of inert ids.
+    NOTE: everything here keys on `behaves_scammy`, never on `is_scammer`. The network
+          can only see behaviour. So the 12% of scammers who lie low keep an innocent
+          looking social circle, and the 5% of innocent senders who look odd get a
+          spray list. Keying on the hidden truth would make the graph a perfect lie
+          detector and every score in the paper meaningless.
     """
-    base = _sender_number(sender) * 37               # each sender starts in its own area
-    if scammy:
-        if position > 0 and rng.random() < 0.25:     # 25%: pester a previous victim again
-            slot = base + int(rng.integers(0, position))
+    ordinary = senders.loc[~senders["behaves_scammy"], "sender_id"].tolist()
+    strangers = [f"R{index:05d}" for index in range(N_RECIPIENTS)]
+    contacts = {}
+    for position, sender in enumerate(senders["sender_id"]):
+        contacts[sender] = _circle_of(position, sender, ordinary)
+    for ring, group in senders[senders["behaves_scammy"]].groupby("sender_ring"):
+        pool = _victim_pool(ring, ordinary, strangers)
+        for sender in group["sender_id"]:
+            contacts[sender] = pool          # every member of the ring shares the list
+    return contacts
+
+
+def _circle_of(position, sender, ordinary):
+    """
+    Find the few friends an ordinary-looking account messages.
+
+    WHAT: returns up to BENIGN_CONTACTS other accounts from the same social circle.
+    WHY:  keeping the circle small and CLOSED is what creates triangles in the graph,
+          which is the only reason the clustering coefficient carries any information.
+    """
+    if not ordinary:
+        return ["R00000"]
+    first = (position // SOCIAL_CIRCLE * SOCIAL_CIRCLE) % len(ordinary)
+    members = [p for p in ordinary[first:first + SOCIAL_CIRCLE] if p != sender]
+    return members[:BENIGN_CONTACTS] or [ordinary[0]]
+
+
+def _victim_pool(ring, people, strangers):
+    """
+    Build the shared victim list for one scam ring.
+
+    WHAT: returns RING_VICTIM_POOL recipient ids, mostly real people.
+    WHY:  a ring works from one list. Two accounts hitting the same victims is the
+          clearest sign they are the same operation.
+    HOW:  the starting point is derived from the ring NAME, so it is the same on every
+          run (the same reason we never use Python's hash()).
+    """
+    start = sum(ord(character) for character in ring) * 17
+    pool = []
+    for step in range(RING_VICTIM_POOL):
+        if step % 4 == 3:                              # one in four is a stranger
+            pool.append(strangers[(start + step) % len(strangers)])
         else:
-            slot = base + position                   # otherwise a fresh stranger
-    elif rng.random() < 0.15:                        # 15%: a normal person meets someone new
-        slot = base + BENIGN_CONTACTS + position
-    else:
-        slot = base + (position % BENIGN_CONTACTS)    # usually the same few contacts
-    return f"R{slot % N_RECIPIENTS:05d}"
+            pool.append(people[(start + step) % len(people)])
+    return pool
+
+
+def _pick_recipient(candidates, sender, position, scammy, rng):
+    """
+    Choose who this message goes to, from the sender's own contact list.
+
+    WHAT: returns one recipient id.
+    WHY:  scammy senders work steadily down a long shared list, so their recipients
+          keep being new AND overlap with their ring partners. Normal senders cycle
+          round their few friends.
+    THE JITTER MATTERS: without it every scammy sender would reach a brand-new person
+    every single time, so "unique recipients / messages sent == 1.0" would identify a
+    scammer perfectly and F3 would get a free answer instead of a real problem.
+    """
+    if scammy:
+        start = _sender_number(sender) * 7             # each member enters the list
+        if position > 0 and rng.random() < 0.25:       # 25%: pester a victim again
+            step = int(rng.integers(0, position))
+        else:
+            step = position
+        return candidates[(start + step) % len(candidates)]
+    if rng.random() < 0.15:                            # 15%: a normal person meets someone new
+        return f"R{(_sender_number(sender) * 37 + position) % N_RECIPIENTS:05d}"
+    return candidates[position % len(candidates)]
 
 
 def _pick_timestamp(sender, scammy, rng):
@@ -512,8 +637,11 @@ def _pick_timestamp(sender, scammy, rng):
     """
     base = pd.Timestamp("2026-01-01")
     if scammy:
-        burst_day = _sender_number(sender) % 55       # stable, not process-dependent
-        return base + pd.Timedelta(days=burst_day, minutes=int(rng.integers(0, 6 * 60)))
+        burst_day = _sender_number(sender) % 50       # stable, not process-dependent
+        # each campaign has its OWN pace: some finish in 2 hours, some take 10 days
+        window = BURST_HOURS_MIN + (_sender_number(sender) * 7) % (
+            BURST_HOURS_MAX - BURST_HOURS_MIN)
+        return base + pd.Timedelta(days=burst_day, minutes=int(rng.integers(0, window * 60)))
     return base + pd.Timedelta(days=int(rng.integers(0, 60)),
                                minutes=int(rng.integers(0, 24 * 60)))
 

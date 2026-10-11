@@ -74,13 +74,62 @@ N_SYNTHETIC_MESSAGES = 2500
 # the count follow from the number of messages, because that is what creates the signal
 # F3 looks for: a scam campaign is a few senders blasting many strangers, while a normal
 # person sends a few messages to the same handful of contacts.
-MESSAGES_PER_SCAM_SENDER = 25    # few scam senders, each very busy  -> high fan-out
-MESSAGES_PER_BENIGN_SENDER = 6   # many normal senders, each quiet   -> low fan-out
+# These are AVERAGES, not fixed quotas. Each sender also gets a random activity weight
+# (see ACTIVITY_SPREAD), so the two groups overlap heavily instead of sitting either
+# side of a clean threshold.
+#
+# WHY THE NUMBERS ARE THIS CLOSE: with 25 against 6 and no spread, message volume WAS
+# the label. `out_degree` alone reached F1 = 1.00 and the model ignored all 33 other
+# features. Perfect scores mean the simulation leaked the answer, not that the method
+# works, so the gap is deliberately modest and blurred.
+MESSAGES_PER_SCAM_SENDER = 14    # scam senders are busier on average...
+MESSAGES_PER_BENIGN_SENDER = 6   # ...but plenty of normal people are busy too
+
+# Sigma of the lognormal activity weight. Higher = more overlap between the groups.
+# Real traffic is heavy tailed: a few accounts send far more than everyone else, in
+# BOTH groups (a shop or a chatty friend, and a cautious low-volume fraudster).
+ACTIVITY_SPREAD = 0.9
+
+# A campaign does not always finish in an afternoon. Burst windows are drawn from this
+# range in hours, so some rings blast in 2 hours and others trickle over 10 days -
+# otherwise `burstiness` separates the classes perfectly on its own.
+BURST_HOURS_MIN = 2
+BURST_HOURS_MAX = 240
 BENIGN_CONTACTS = 3              # a normal person texts the same ~3 people repeatedly
+
+# Normal people are grouped into small social circles and mostly message inside them.
+# This matters for the graph: friends-of-friends create TRIANGLES, which is what the
+# clustering coefficient measures. Without circles the graph is strictly
+# sender -> recipient (bipartite), every clustering value is exactly 0, and the feature
+# is dead weight.
+SOCIAL_CIRCLE = 6
+
+# A scam ring shares one victim list, so ring members hit overlapping targets - which
+# is what makes a ring detectable as a group rather than as separate accounts.
+RING_VICTIM_POOL = 150
 
 # With the message counts we actually build, the two numbers above work out to roughly
 # 1,000 senders, which is the scale the project brief asks for.
 N_RECIPIENTS = 3000
+
+# The most parents any node may have during structure learning (F5). A cap is needed
+# because a node with many parents needs a probability table bigger than our data can
+# fill reliably.
+MAX_INDEGREE = 3
+
+# F7 tries changing 1 variable, then 2, then 3. Beyond 3 a 'counterfactual' stops
+# being an explanation anyone can act on.
+MAX_COUNTERFACTUAL_CHANGES = 3
+
+# Folds used for the out-of-fold predictions that train the F4 stack.
+N_FOLDS = 5
+
+# How many features F3 keeps when it reports a selected shortlist.
+TOP_K_FEATURES = 15
+
+# Betweenness centrality is slow to compute exactly, so F3 approximates it from this
+# many randomly chosen source nodes. 200 is plenty for a graph of a few thousand nodes.
+BETWEENNESS_SAMPLE = 200
 
 # How many messages one "ring" (one campaign) accounts for. Rings are the unit we hold
 # out in the leak-safe split, so smaller rings = finer control over the split size.
