@@ -118,7 +118,7 @@ S00115,uci_ham__r10,uci_ham,False,False,2,2035,1.4452640931606138
 S00116,uci_ham__r11,uci_ham,False,False,1,533,2.8048625928096373
 S00117,uci_ham__r12,uci_ham,False,False,0,1027,1.4220992709097142
 S00118,uci_ham__r13,uci_ham,False,False,1,1534,0.4977231721658311
-S00119,uci_ham__r14,uci_ham,False,False,0,510,1.7072296402557428
+S00119,uci_ham__r14,uci_ham,False,False,0,510,1.707229640255743
 S00120,uci_ham__r0,uci_ham,False,False,0,2389,1.1649138838424742
 S00121,uci_ham__r1,uci_ham,False,True,7,126,1.7871283970532321
 S00122,uci_ham__r2,uci_ham,False,False,0,78,1.5299994429513228
@@ -651,7 +651,7 @@ S00648,uci_ham__r3,uci_ham,False,False,2,519,1.8446074091317926
 S00649,uci_ham__r4,uci_ham,False,False,1,316,0.29398570983861505
 S00650,uci_ham__r5,uci_ham,False,False,0,445,0.5976268384125943
 S00651,uci_ham__r6,uci_ham,False,False,2,1853,0.1385531773287008
-S00652,uci_ham__r7,uci_ham,False,False,2,2147,0.8796429043984996
+S00652,uci_ham__r7,uci_ham,False,False,2,2147,0.8796429043984997
 S00653,uci_ham__r8,uci_ham,False,False,1,2405,0.14258777603101333
 S00654,uci_ham__r9,uci_ham,False,False,1,336,3.318110623593051
 S00655,uci_ham__r10,uci_ham,False,False,0,846,4.052521666710053
@@ -690,7 +690,7 @@ S00687,uci_ham__r12,uci_ham,False,False,1,234,0.7927537827344551
 S00688,uci_ham__r13,uci_ham,False,False,1,48,2.685385274978361
 S00689,uci_ham__r14,uci_ham,False,False,0,1567,1.7887281014757233
 S00690,uci_ham__r0,uci_ham,False,False,2,1025,1.0269292394033496
-S00691,uci_ham__r1,uci_ham,False,False,0,187,1.568789031988892
+S00691,uci_ham__r1,uci_ham,False,False,0,187,1.5687890319888922
 S00692,uci_ham__r2,uci_ham,False,False,0,2387,1.5433404234147103
 S00693,uci_ham__r3,uci_ham,False,False,1,1599,6.64059154859331
 S00694,uci_ham__r4,uci_ham,False,False,2,59,1.2561193048161532
@@ -750,7 +750,7 @@ S00747,uci_ham__r12,uci_ham,False,False,1,444,0.8146315561550599
 S00748,uci_ham__r13,uci_ham,False,False,0,1932,1.511985762200609
 S00749,uci_ham__r14,uci_ham,False,True,4,83,26.579466929427333
 S00750,uci_ham__r0,uci_ham,False,False,1,135,2.459618690463459
-S00751,uci_ham__r1,uci_ham,False,False,1,348,1.239093448481538
+S00751,uci_ham__r1,uci_ham,False,False,1,348,1.2390934484815377
 S00752,uci_ham__r2,uci_ham,False,False,1,1452,13.466950795950869
 S00753,uci_spam__r0,uci_spam,True,True,3,277,3.3348750037456405
 S00754,uci_spam__r1,uci_spam,True,True,3,178,5.06445041632814
@@ -775,7 +775,7 @@ S00772,uci_spam__r1,uci_spam,True,True,7,230,1.7162742360116532
 S00773,uci_spam__r0,uci_spam,True,True,4,262,1.2178419886902143
 S00774,uci_spam__r1,uci_spam,True,True,2,322,2.722615684272916
 S00775,uci_spam__r0,uci_spam,True,True,2,162,6.008413390994772
-S00776,uci_spam__r1,uci_spam,True,True,3,102,10.479233975338433
+S00776,uci_spam__r1,uci_spam,True,True,3,102,10.479233975338431
 S00777,uci_spam__r0,uci_spam,True,True,1,222,3.0641539123260766
 S00778,uci_spam__r1,uci_spam,True,False,0,722,2.979669639495003
 S00779,uci_spam__r0,uci_spam,True,True,1,111,2.4738355496458375
@@ -860,7 +860,7 @@ S00857,bank_statement__r1,bank_statement,False,False,0,274,1.4014334956718095
 S00858,bank_statement__r0,bank_statement,False,False,0,1327,3.181892723469897
 S00859,bank_statement__r1,bank_statement,False,False,1,2721,0.2502513275857129
 S00860,bank_statement__r0,bank_statement,False,False,0,2057,0.29730450874047554
-S00861,bank_statement__r1,bank_statement,False,False,1,607,3.811253110082618
+S00861,bank_statement__r1,bank_statement,False,False,1,607,3.8112531100826184
 S00862,bank_statement__r0,bank_statement,False,False,0,2110,1.9343284016915363
 S00863,bank_statement__r1,bank_statement,False,False,0,591,0.7918031189827469
 S00864,bank_statement__r0,bank_statement,False,False,0,1074,4.6477093519117325

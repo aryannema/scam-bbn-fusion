@@ -38,7 +38,7 @@ All eight functionalities are complete, tested, and demoable from both
 
 ## Tests
 
-One test file per functionality, 145 tests total, all passing.
+One test file per functionality, 145 tests total, all passing. 
 
 | Functionality | Test file |
 |---|---|

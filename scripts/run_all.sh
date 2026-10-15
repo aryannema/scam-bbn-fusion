@@ -17,12 +17,16 @@ cd "$(dirname "$0")/.."
 
 # Prefer the project's own virtual environment if it exists, so the pinned versions
 # in requirements.txt are the ones actually used.
+
 if [ -x ".venv/bin/python" ]; then
   PYTHON=".venv/bin/python"
+elif [ -x ".venv/Scripts/python.exe" ]; then
+  PYTHON=".venv/Scripts/python.exe"
 else
   PYTHON="python3"
   echo "NOTE: .venv not found, using system python3. See docs/SETUP.md."
 fi
+
 
 banner() {
   echo
